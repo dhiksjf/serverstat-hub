@@ -10,13 +10,11 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
-import a2s
 import asyncio
-import socket
-import time
 import zipfile
 import io
 import shutil
+from cs_server_fetcher import create_fetcher
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -101,47 +99,9 @@ class WidgetConfigCreate(BaseModel):
 
 # Helper function to query CS 1.6 server
 def query_cs_server(ip: str, port: int, timeout: float = 3.0) -> Dict[str, Any]:
-    """Query a CS 1.6 server using the Source/GoldSrc protocol"""
-    try:
-        address = (ip, port)
-        
-        # Measure ping
-        start_time = time.time()
-        info = a2s.info(address, timeout=timeout)
-        ping = (time.time() - start_time) * 1000
-        
-        # Try to get player list
-        try:
-            players = a2s.players(address, timeout=timeout)
-            player_list = [
-                {"name": p.name, "score": p.score, "duration": p.duration}
-                for p in players if p.name
-            ]
-        except Exception:
-            player_list = []
-        
-        return {
-            "success": True,
-            "data": {
-                "hostname": info.server_name,
-                "map": info.map_name,
-                "current_players": info.player_count,
-                "max_players": info.max_players,
-                "game": info.game,
-                "server_type": info.server_type,
-                "os": info.platform,
-                "password_protected": info.password_protected,
-                "vac_enabled": info.vac_enabled,
-                "ping": round(ping, 2),
-                "player_list": player_list
-            }
-        }
-    except socket.timeout:
-        return {"success": False, "error": "Connection timeout - server may be offline"}
-    except ConnectionRefusedError:
-        return {"success": False, "error": "Connection refused - invalid IP or port"}
-    except Exception as e:
-        return {"success": False, "error": f"Failed to query server: {str(e)}"}
+    """Query a CS 1.6 server using the A2S (Source Engine) protocol"""
+    fetcher = create_fetcher(timeout=timeout)
+    return fetcher.fetch(ip, port)
 
 
 # API Routes
